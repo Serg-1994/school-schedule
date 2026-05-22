@@ -147,6 +147,16 @@ class Schedule:
         return [Schedule._row_to_schedule(row) for row in rows]
 
     @staticmethod
+    def get_by_subject(subject_id):
+        db = Database()
+        conn = db.connect()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM schedule WHERE subject_id=? ORDER BY date, lesson_number', (subject_id,))
+        rows = cursor.fetchall()
+        db.close()
+        return [Schedule._row_to_schedule(row) for row in rows]
+
+    @staticmethod
     def get_by_id(schedule_id):
         db = Database()
         conn = db.connect()

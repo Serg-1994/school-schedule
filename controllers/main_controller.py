@@ -1,5 +1,5 @@
-import database as db
+from database.database import init_db
 
 class MainController:
     def __init__(self):
-        db.init_db()
+        init_db()

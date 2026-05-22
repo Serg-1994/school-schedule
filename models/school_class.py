@@ -10,13 +10,10 @@ class Class:
         db = Database()
         conn = db.connect()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM classes')
+        cursor.execute('SELECT * FROM classes ORDER BY name')
         rows = cursor.fetchall()
         db.close()
-        classes = []
-        for row in rows:
-            classes.append(Class(id=row[0], name=row[1]))
-        return classes
+        return [Class(id=row[0], name=row[1]) for row in rows]
 
     def save(self):
         db = Database()
@@ -43,15 +40,11 @@ class Class:
         return None
 
     def delete(self):
-        if self.id:
-            db = Database()
-            conn = db.connect()
-            cursor = conn.cursor()
-            # Проверить, есть ли связанные записи в schedule
-            cursor.execute('SELECT COUNT(*) FROM schedule WHERE class_id=?', (self.id,))
-            count = cursor.fetchone()[0]
-            if count > 0:
-                raise ValueError(f"Нельзя удалить класс {self.name}, так как у него есть {count} уроков в расписании.")
-            cursor.execute('DELETE FROM classes WHERE id=?', (self.id,))
-            conn.commit()
-            db.close()
+        if not self.id:
+            return
+        db = Database()
+        conn = db.connect()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM classes WHERE id=?', (self.id,))
+        conn.commit()
+        db.close()
