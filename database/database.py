@@ -86,4 +86,89 @@ def init_db():
         if table_has_column(conn, 'schedule', 'id') and not table_has_column(conn, 'schedule', 'status'):
             conn.execute("ALTER TABLE schedule ADD COLUMN status TEXT DEFAULT 'работает'")
 
+# --- Логика Больничных и Замен ---
+
+def add_absence_and_update_schedule(teacher_id, start_date, end_date, reason="больничный"):
+    """
+    Фиксирует больничный в таблице absences и автоматически переводит 
+    все запланированные уроки учителя в этот период в статус 'болеет'.
+    """
+    with get_db() as conn:
+        # 1. Записываем дни отсутствия (для простоты генерируем записи по дням)
+        # В реальном GUI можно передать список дат или пройтись циклом от start до end
+        import datetime
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+        current = start
+        
+        while current <= end:
+            date_str = current.strftime("%Y-%m-%d")
+            conn.execute("""
+                INSERT OR REPLACE INTO absences (teacher_id, date, reason)
+                VALUES (?, ?, ?)
+            """, (teacher_id, date_str, reason))
+            
+            # 2. Меняем статус уроков этого учителя на 'болеет' на этот день
+            conn.execute("""
+                UPDATE schedule 
+                SET status = 'болеет'
+                WHERE teacher_id = ? AND date = ? AND status = 'работает'
+            """, (teacher_id, date_str))
+            
+            current += datetime.timedelta(days=1)
+            
+        conn.commit()
+
+def get_available_teachers_for_lesson(date_str, lesson_number, subject_id):
+    """
+    Возвращает список ВСЕХ учителей с отметкой, свободны они (зеленые) или заняты (красные).
+    Приоритет отдается тем, у кого совпадает предмет (специализация).
+    """
+    with get_db() as conn:
+        # Получаем список учителей и проверяем, есть ли у них уроки в это время
+        sql = """
+            SELECT t.id, t.name, t.specialization,
+                   (SELECT COUNT(*) FROM schedule s WHERE s.teacher_id = t.id AND s.date = ? AND s.lesson_number = ?) as is_busy,
+                   (SELECT COUNT(*) FROM absences a WHERE a.teacher_id = t.id AND a.date = ?) as is_absent
+            FROM teachers t
+            ORDER BY t.name
+        """
+        rows = conn.execute(sql, (date_str, lesson_number, date_str)).fetchall()
+        
+        result = []
+        for row in rows:
+            # Если учитель сам на больничном, вообще его не предлагаем
+            if row['is_absent'] > 0:
+                continue
+                
+            status_color = "green" if row['is_busy'] == 0 else "red"
+            result.append({
+                "id": row['id'],
+                "name": row['name'],
+                "specialization": row['specialization'],
+                "status_color": status_color
+            })
+        return result
+
+def assign_substitution(sub_teacher_id, original_lesson_id):
+    """
+    Назначает учителя на замену.
+    Создает дубликат урока, но для нового учителя и со статусом 'замена'.
+    """
+    with get_db() as conn:
+        # Получаем данные оригинального урока
+        lesson = conn.execute("SELECT * FROM schedule WHERE id = ?", (original_lesson_id,)).fetchone()
+        if not lesson:
+            return False
+            
+        # Создаем запись замены
+        conn.execute("""
+            INSERT INTO schedule (teacher_id, class_id, subject_id, date, lesson_number, status)
+            VALUES (?, ?, ?, ?, ?, 'замена')
+        """, (sub_teacher_id, lesson['class_id'], lesson['subject_id'], lesson['date'], lesson['lesson_number'],))
+        
+        # Обновляем оригинальный урок, связывая его (опционально, можно хранить ID замены в статусе)
+        conn.commit()
+        return True
+    
         conn.commit()
