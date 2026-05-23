@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row g-4">
+
+  {# ── Sidebar: teacher list ── #}
+  <div class="col-md-3 col-xl-2">
+    <div class="card info-card p-3">
+      <div class="text-uppercase text-muted fw-bold mb-2" style="font-size:.72rem;letter-spacing:.08em">Учителя</div>
+      {% for t in teachers %}
+        <a class="teacher-link {% if selected and selected.id == t.id %}active{% endif %}"
+           href="/schedule/{{ t.id }}/{{ year }}/{{ month }}">
+          {{ t.name }}
+        </a>
+      {% else %}
+        <p class="text-muted small mt-2">Нет учителей. <a href="/teachers">Добавить</a></p>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# ── Main area ── #}
+  <div class="col-md-9 col-xl-10">
+
+    {% if not selected %}
+    <div class="text-center text-muted mt-5 pt-4">
+      <i class="bi bi-person-lines-fill" style="font-size:3.5rem;opacity:.3"></i>
+      <p class="mt-3 fs-5">Выберите учителя из списка слева</p>
+    </div>
+
+    {% else %}
+
+    {# Month navigation #}
+    <div class="d-flex align-items-center mb-3">
+      <a href="/schedule/{{ selected.id }}/{{ prev_year }}/{{ prev_month }}"
+         class="btn btn-outline-secondary btn-sm me-2">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <h5 class="mb-0 fw-bold me-2">{{ month_name }}</h5>
+      <a href="/schedule/{{ selected.id }}/{{ next_year }}/{{ next_month }}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </div>
+
+    {# Teacher info strip #}
+    {% if teacher_info %}
+    <div class="card info-card mb-3">
+      <div class="card-body py-2 d-flex flex-wrap gap-3 align-items-center">
+        <span class="fw-semibold fs-6">{{ selected.name }}</span>
+        <span class="text-muted">Предметы: {{ selected.specialization | join(", ") or "—" }}</span>
+        <span class="vr"></span>
+        <span>Ставка: <strong>{{ teacher_info.rate }} ч</strong></span>
+        <span>Отработано:
+          <strong class="
+            {% if teacher_info.diff < 0 %}text-danger
+            {% elif teacher_info.diff > 0 %}text-success
+            {% endif %}">{{ teacher_info.hours }} ч</strong>
+          {% if teacher_info.diff != 0 %}
+          <small class="text-muted">({{ "+" if teacher_info.diff > 0 else "" }}{{ teacher_info.diff }})</small>
+          {% endif %}
+        </span>
+        <span class="vr"></span>
+        <span class="text-muted small">
+          На замене: {{ teacher_info.counts["на замене"] }} &nbsp;|&nbsp;
+          Болеет: {{ teacher_info.counts["болеет"] }} &nbsp;|&nbsp;
+          Отсутствует: {{ teacher_info.counts["отсутствует"] }}
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
+    {# Calendar #}
+    <div class="card info-card overflow-hidden">
+      <table class="cal-table">
+        <thead>
+          <tr>
+            {% for d in weekdays %}
+            <th>{{ d }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for week in weeks %}
+          <tr>
+            {% for cell in week %}
+              {% if cell is none %}
+              <td class="empty"></td>
+              {% else %}
+              <td class="
+                {% if cell.is_today %}today
+                {% elif cell.is_weekend %}weekend
+                {% endif %}">
+                <a class="day-link" href="/schedule/{{ selected.id }}/day/{{ cell.date_str }}">
+                  <div class="day-num">{{ cell.day }}</div>
+                  {% if cell.count %}
+                  <span class="badge bg-primary lesson-badge">{{ cell.count }} ур.</span>
+                  {% endif %}
+                </a>
+              </td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-muted small mt-2">
+      <i class="bi bi-info-circle me-1"></i>Нажмите на день чтобы добавить или изменить уроки
+    </p>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

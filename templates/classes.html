@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-5 col-md-7">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0"><i class="bi bi-building me-2"></i>Классы</h5>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success alert-dismissible fade show">
+      <i class="bi bi-check-circle-fill me-2"></i>{{ success }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
+    {# Add form #}
+    <div class="card info-card mb-3">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-2">Добавить класс</h6>
+        <form method="post" action="/classes/add" class="d-flex gap-2">
+          <input name="name" class="form-control form-control-sm"
+                 placeholder="Например: 5А" required>
+          <button type="submit" class="btn btn-success btn-sm px-3">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# List #}
+    <div class="card info-card">
+      <div class="card-body p-0">
+        <table class="table data-table mb-0">
+          <thead>
+            <tr>
+              <th class="ps-3">Название</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cls in classes %}
+            <tr>
+              <td class="ps-3 fw-semibold">{{ cls.name }}</td>
+              <td class="text-end pe-3">
+                <form method="post" action="/classes/{{ cls.id }}/delete"
+                      class="d-inline"
+                      onsubmit="return confirm('Удалить класс {{ cls.name }}?')">
+                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2" class="text-center text-muted py-4">Нет классов</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Школьное расписание</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body { background: #f0f4f8; min-height: 100vh; }
+
+    .navbar { background: linear-gradient(90deg, #1a3a6b 0%, #2563ae 100%); box-shadow: 0 2px 8px rgba(0,0,0,.18); }
+    .navbar-brand { font-size: 1.15rem; letter-spacing: .02em; }
+
+    /* Sidebar teachers */
+    .teacher-link { display: block; padding: 7px 12px; border-radius: 8px; text-decoration: none;
+                    color: #334; font-size: .9rem; transition: background .15s; }
+    .teacher-link:hover { background: #e2eaf7; color: #1a3a6b; }
+    .teacher-link.active { background: #2563ae; color: #fff !important; font-weight: 600; }
+
+    /* Calendar */
+    .cal-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .cal-table th { text-align: center; padding: 6px 0; font-size: .78rem;
+                    font-weight: 600; color: #6b7280; background: #f8fafc; border: 1px solid #e5e7eb; }
+    .cal-table td { border: 1px solid #e5e7eb; vertical-align: top; height: 72px; background: #fff; }
+    .cal-table td.empty { background: #f9fafb; }
+    .cal-table td.weekend { background: #fef9f0; }
+    .cal-table td.today { background: #fffbeb; outline: 2px solid #f59e0b; outline-offset: -2px; }
+    .day-link { display: block; height: 100%; padding: 5px 7px; text-decoration: none; color: inherit; }
+    .day-link:hover { background: rgba(37,99,174,.07); }
+    .day-num { font-size: .8rem; color: #9ca3af; }
+    .today .day-num { color: #d97706; font-weight: 700; }
+    .lesson-badge { font-size: .7rem; margin-top: 3px; }
+
+    /* Cards */
+    .info-card { border: none; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+
+    /* Alerts */
+    .alert { border-radius: 10px; }
+
+    /* Forms */
+    .form-control, .form-select { border-radius: 8px; }
+    .btn { border-radius: 8px; }
+
+    /* Tables */
+    .data-table th { font-size: .82rem; font-weight: 600; color: #6b7280; background: #f8fafc; }
+    .data-table td { vertical-align: middle; font-size: .9rem; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-expand-md px-3 mb-4">
+  <a class="navbar-brand fw-bold" href="/">📅 Школьное расписание</a>
+  <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <div class="collapse navbar-collapse" id="nav">
+    <ul class="navbar-nav ms-auto gap-1">
+      <li class="nav-item"><a class="nav-link" href="/schedule"><i class="bi bi-calendar3 me-1"></i>Расписание</a></li>
+      <li class="nav-item"><a class="nav-link" href="/teachers"><i class="bi bi-people me-1"></i>Учителя</a></li>
+      <li class="nav-item"><a class="nav-link" href="/classes"><i class="bi bi-building me-1"></i>Классы</a></li>
+      <li class="nav-item"><a class="nav-link" href="/subjects"><i class="bi bi-book me-1"></i>Предметы</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
