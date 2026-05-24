@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QListWidget, QCalendarWidget,
     QHBoxLayout, QWidget, QVBoxLayout, QLabel, QPushButton,
     QDialog, QComboBox, QGridLayout, QTabWidget, QFormLayout,
-    QLineEdit, QSpinBox, QDialogButtonBox, QMessageBox, QListWidgetItem
+    QLineEdit, QSpinBox, QDialogButtonBox, QMessageBox, QListWidgetItem,
+    QDateEdit
 )
 from PyQt6.QtGui import QPainter, QBrush, QColor, QPalette
 from PyQt6.QtCore import QDate, Qt
@@ -13,7 +14,7 @@ from models.subject import Subject
 from models.schedule import Schedule
 from controllers.main_controller import MainController
 import json
-from database import database as db_mod  # Глобальный импорт модуля базы данных
+from database import database as db_mod  # Правильный импорт модуля database.py внутри пакета
 
 
 class ScheduleCalendar(QCalendarWidget):
@@ -22,8 +23,9 @@ class ScheduleCalendar(QCalendarWidget):
         self.main_window = main_window
         self.teacher_id = None
         self.lesson_counts = {}
-        self.sick_days = set()       # Даты больничных
-        self.sub_days = set()        # Даты замен
+        self.sick_days = set()
+        self.sub_days = set()
+        self.setGridVisible(True)
         self.currentPageChanged.connect(self._on_page_changed)
 
     def set_teacher_id(self, teacher_id):
@@ -40,18 +42,17 @@ class ScheduleCalendar(QCalendarWidget):
         year = self.yearShown()
         month = self.monthShown()
         mw = self.main_window
-        
+
         if (self.teacher_id not in mw.lesson_cache or
                 year not in mw.lesson_cache[self.teacher_id] or
                 month not in mw.lesson_cache[self.teacher_id][year]):
             mw.load_lesson_counts_for_teacher(self.teacher_id, year, month)
-            
+
         self.lesson_counts = mw.lesson_cache[self.teacher_id][year][month]
-        
-        # Загружаем из базы даты больничных и замен для отрисовки статусов
+
         sicks = db_mod.get_teacher_absences_for_month(self.teacher_id, year, month)
         subs = db_mod.get_substitutions_for_month(self.teacher_id, year, month)
-        
+
         self.sick_days = {QDate.fromString(d, 'yyyy-MM-dd') for d in sicks}
         self.sub_days = {QDate.fromString(d, 'yyyy-MM-dd') for d in subs}
         self.update()
@@ -67,8 +68,7 @@ class ScheduleCalendar(QCalendarWidget):
     def paintCell(self, painter, rect, date):
         super().paintCell(painter, rect, date)
         painter.save()
-        
-        # 1. Если учитель БОЛЕЕТ — рисуем красный медицинский крест "✚" в левом верхнем углу
+
         if date in self.sick_days:
             painter.setPen(QColor("#d32f2f"))
             font = painter.font()
@@ -77,8 +77,7 @@ class ScheduleCalendar(QCalendarWidget):
             painter.setFont(font)
             icon_rect = rect.adjusted(4, 2, -1, -1)
             painter.drawText(icon_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, "✚")
-            
-        # 2. Если учитель НА ЗАМЕНЕ — рисуем синюю круговую стрелку "↻"
+
         elif date in self.sub_days:
             painter.setPen(QColor("#1976d2"))
             font = painter.font()
@@ -88,7 +87,6 @@ class ScheduleCalendar(QCalendarWidget):
             icon_rect = rect.adjusted(4, 1, -1, -1)
             painter.drawText(icon_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop, "↻")
 
-        # 3. Количество плановых уроков внизу справа
         count = self.lesson_counts.get(date, 0)
         if count:
             painter.setPen(Qt.GlobalColor.darkRed)
@@ -96,7 +94,7 @@ class ScheduleCalendar(QCalendarWidget):
             text_rect = rect.adjusted(rect.width() - 22, rect.height() - 22, -1, -1)
             painter.drawRoundedRect(text_rect, 3, 3)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(count))
-            
+
         painter.restore()
 
 
@@ -197,7 +195,7 @@ class LessonDialog(QDialog):
         self.date = date
         self.teacher_id = teacher_id
         self.date_str = date.toString('yyyy-MM-dd')
-        
+
         teacher = Teacher.get_by_id(teacher_id)
         self.teacher_name = teacher.name if teacher else str(teacher_id)
         self.setWindowTitle(f"Расписание: {self.teacher_name} — {date.toString('dd.MM.yyyy')}")
@@ -223,7 +221,6 @@ class LessonDialog(QDialog):
             row_idx = i
             self.grid.addWidget(QLabel(f"<b>{i}</b>"), row_idx, 0)
 
-            # Предмет
             subj_combo = QComboBox()
             subj_combo.addItem("—", None)
             for s in self.subjects:
@@ -231,7 +228,6 @@ class LessonDialog(QDialog):
             self.grid.addWidget(subj_combo, row_idx, 1)
             self.subject_combos.append(subj_combo)
 
-            # Класс
             cls_combo = QComboBox()
             cls_combo.addItem("—", None)
             for c in self.classes:
@@ -239,7 +235,6 @@ class LessonDialog(QDialog):
             self.grid.addWidget(cls_combo, row_idx, 2)
             self.class_combos.append(cls_combo)
 
-            # Статус
             status_combo = QComboBox()
             status_combo.addItem("Работает", "работает")
             status_combo.addItem("На замене", "на замене")
@@ -249,14 +244,12 @@ class LessonDialog(QDialog):
             self.grid.addWidget(status_combo, row_idx, 3)
             self.status_combos.append(status_combo)
 
-            # Выбор Учителя на замену
             sub_combo = QComboBox()
             sub_combo.setMinimumWidth(200)
             sub_combo.setEnabled(False)
             self.grid.addWidget(sub_combo, row_idx, 4)
             self.sub_combos.append(sub_combo)
 
-            # Очистка
             clear_btn = QPushButton("✕")
             clear_btn.setFixedWidth(30)
             clear_btn.clicked.connect(lambda checked, row=i-1: self.clear_row(row))
@@ -273,7 +266,7 @@ class LessonDialog(QDialog):
     def toggle_substitution_view(self, row):
         status = self.status_combos[row].currentData()
         sub_combo = self.sub_combos[row]
-        
+
         if status != 'болеет':
             sub_combo.clear()
             sub_combo.setEnabled(False)
@@ -282,7 +275,7 @@ class LessonDialog(QDialog):
         sub_combo.setEnabled(True)
         sub_combo.clear()
         sub_combo.addItem("— Выберите учителя на замену —", None)
-        
+
         lesson_number = row + 1
 
         for teacher in self.all_teachers:
@@ -303,25 +296,24 @@ class LessonDialog(QDialog):
                 self.subject_combos[idx].setCurrentIndex(self.subject_combos[idx].findData(sched.subject_id))
                 self.class_combos[idx].setCurrentIndex(self.class_combos[idx].findData(sched.class_id))
                 self.status_combos[idx].setCurrentIndex(self.status_combos[idx].findData(sched.status))
-                
+
                 if sched.status == 'болеет':
                     self.toggle_substitution_view(idx)
-                    with db_mod.get_db() as conn:
-                        sub_row = conn.execute("""
-                            SELECT teacher_id FROM schedule 
-                            WHERE date = ? AND lesson_number = ? AND class_id = ? AND status = 'на замене'
-                        """, (self.date_str, idx + 1, sched.class_id)).fetchone()
-                        if sub_row:
-                            self.sub_combos[idx].setCurrentIndex(self.sub_combos[idx].findData(sub_row['teacher_id']))
+                    try:
+                        with db_mod.get_db() as conn:
+                            sub_row = conn.execute("""
+                                SELECT teacher_id FROM schedule
+                                WHERE date = ? AND lesson_number = ? AND class_id = ? AND status = 'на замене'
+                            """, (self.date_str, idx + 1, sched.class_id)).fetchone()
+                            if sub_row:
+                                sub_teacher_id = sub_row['teacher_id'] if hasattr(sub_row, 'keys') else sub_row[0]
+                                self.sub_combos[idx].setCurrentIndex(self.sub_combos[idx].findData(sub_teacher_id))
+                    except Exception as e:
+                        print(f"Ошибка загрузки замены: {e}")
 
     def save_schedule(self):
-        existing = Schedule.get_by_date_and_teacher(self.date_str, self.teacher_id)
-        for sched in existing:
-            with db_mod.get_db() as conn:
-                conn.execute("DELETE FROM schedule WHERE date = ? AND lesson_number = ? AND class_id = ? AND status = 'на замене'", 
-                             (self.date_str, sched.lesson_number, sched.class_id))
-            sched.delete()
-
+        # --- ЭТАП 1: собрать и провалидировать все новые записи до удаления старых ---
+        new_entries = []
         for i in range(8):
             subj_id = self.subject_combos[i].currentData()
             cls_id = self.class_combos[i].currentData()
@@ -332,37 +324,73 @@ class LessonDialog(QDialog):
             status = self.status_combos[i].currentData() or "работает"
             sub_teacher_id = self.sub_combos[i].currentData()
 
-            if status != 'болеет':
-                class_conflict = Schedule.get_conflicting_class_entry(cls_id, self.date_str, lesson_number)
-                if class_conflict and class_conflict[1] != self.teacher_id:
-                    conflict_teacher = Teacher.get_by_id(class_conflict[1])
+            # Проверка конфликта класса — всегда, независимо от статуса
+            class_conflict = Schedule.get_conflicting_class_entry(cls_id, self.date_str, lesson_number)
+            if class_conflict and class_conflict[1] != self.teacher_id:
+                conflict_teacher = Teacher.get_by_id(class_conflict[1])
+                QMessageBox.critical(
+                    self, "Конфликт класса",
+                    f"Класс уже занят на урок {lesson_number} у учителя {conflict_teacher.name if conflict_teacher else '?'}. "
+                    f"Сначала освободите класс или выберите другой."
+                )
+                return
+
+            # Если болеет и есть замена — проверить, не занят ли заменяющий
+            if status == 'болеет' and sub_teacher_id:
+                sub_conflict = Schedule.get_conflicting_teacher_entry(sub_teacher_id, self.date_str, lesson_number)
+                if sub_conflict:
+                    conflict_cls = Class.get_by_id(sub_conflict[2])
                     QMessageBox.critical(
-                        self, "Конфликт класса",
-                        f"Класс уже занят на урок {lesson_number} у учителя {conflict_teacher.name if conflict_teacher else '?'}"
+                        self, "Конфликт замены",
+                        f"Учитель на замену уже занят на урок {lesson_number} "
+                        f"(класс {conflict_cls.name if conflict_cls else '?'})."
                     )
                     return
 
+            new_entries.append({
+                'lesson_number': lesson_number,
+                'class_id': cls_id,
+                'subject_id': subj_id,
+                'status': status,
+                'sub_teacher_id': sub_teacher_id
+            })
+
+        # --- ЭТАП 2: удалить старые записи ---
+        existing = Schedule.get_by_date_and_teacher(self.date_str, self.teacher_id)
+        for sched in existing:
+            try:
+                with db_mod.get_db() as conn:
+                    conn.execute(
+                        "DELETE FROM schedule WHERE date = ? AND lesson_number = ? AND class_id = ? AND status = 'на замене'",
+                        (self.date_str, sched.lesson_number, sched.class_id)
+                    )
+                sched.delete()
+            except Exception as e:
+                print(f"Ошибка удаления старой записи: {e}")
+
+        # --- ЭТАП 3: сохранить новые ---
+        for entry in new_entries:
             main_sched = Schedule(
                 teacher_id=self.teacher_id,
-                class_id=cls_id,
-                subject_id=subj_id,
+                class_id=entry['class_id'],
+                subject_id=entry['subject_id'],
                 date=self.date_str,
-                lesson_number=lesson_number,
-                status=status
+                lesson_number=entry['lesson_number'],
+                status=entry['status']
             )
             main_sched.save()
 
-            if status == 'болеет' and sub_teacher_id:
+            if entry['status'] == 'болеет' and entry['sub_teacher_id']:
                 sub_sched = Schedule(
-                    teacher_id=sub_teacher_id,
-                    class_id=cls_id,
-                    subject_id=subj_id,
+                    teacher_id=entry['sub_teacher_id'],
+                    class_id=entry['class_id'],
+                    subject_id=entry['subject_id'],
                     date=self.date_str,
-                    lesson_number=lesson_number,
+                    lesson_number=entry['lesson_number'],
                     status='на замене'
                 )
                 sub_sched.save()
-                self.parent().update_lesson_cache_for_teacher(sub_teacher_id)
+                self.parent().update_lesson_cache_for_teacher(entry['sub_teacher_id'])
 
         self.accept()
 
@@ -598,6 +626,7 @@ class MainWindow(QMainWindow):
             "QPushButton { background-color: #d8e2f1; border: 1px solid #8aa7c7; padding: 4px 10px; }"
             "QPushButton:hover { background-color: #b9d0ee; }"
             "QListWidget { alternate-background-color: #f0f5fb; }"
+            "QCalendarWidget QTableView { gridline-color: #000000; }"
         )
 
     def set_dark_theme(self):
@@ -620,6 +649,7 @@ class MainWindow(QMainWindow):
             "QTabBar::tab:selected { background: #3c4048; font-weight: bold; }"
             "QPushButton { padding: 4px 10px; }"
             "QPushButton:hover { background-color: #4a5060; }"
+            "QCalendarWidget QTableView { gridline-color: #666666; }"
         )
 
     def setup_schedule_tab(self):
@@ -681,12 +711,12 @@ class MainWindow(QMainWindow):
         self.teacher_info_label.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.teacher_info_label.setMinimumWidth(300)
         right.addWidget(self.teacher_info_label)
-        
+
         self.btn_add_sick = QPushButton("✚ Оформить больничный")
         self.btn_add_sick.setStyleSheet("background-color: #ffcccc; color: #b30000; font-weight: bold;")
         self.btn_add_sick.clicked.connect(self.add_sick_leave_for_current)
         right.addWidget(self.btn_add_sick)
-        
+
         right.addStretch()
         layout.addLayout(right, 1)
         self.load_teachers_list()
@@ -738,6 +768,8 @@ class MainWindow(QMainWindow):
         current = self.teachers_list.currentItem()
         if current:
             self.display_teacher_info(current)
+        else:
+            self.teacher_info_label.setText("Выберите учителя, чтобы увидеть данные")
 
     def add_teacher(self):
         dialog = TeacherDialog(parent=self)
@@ -916,40 +948,42 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             subj.delete()
             self.load_subjects_list()
-            
+
     def add_sick_leave_for_current(self):
         current = self.teachers_list.currentItem()
         if not current:
             QMessageBox.warning(self, "Выберите учителя", "Сначала выберите учителя из списка.")
             return
         teacher = current.data(Qt.ItemDataRole.UserRole)
-        
+
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Больничный: {teacher.name}")
         form = QFormLayout(dialog)
-        
-        from PyQt6.QtWidgets import QDateEdit
+
         start_edit = QDateEdit(QDate.currentDate())
         end_edit = QDateEdit(QDate.currentDate().addDays(7))
         start_edit.setCalendarPopup(True)
         end_edit.setCalendarPopup(True)
-        
+
         form.addRow("Дата начала:", start_edit)
         form.addRow("Дата окончания:", end_edit)
-        
+
         bbox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         bbox.accepted.connect(dialog.accept)
         bbox.rejected.connect(dialog.reject)
         form.addRow(bbox)
-        
+
         if dialog.exec():
             s_str = start_edit.date().toString("yyyy-MM-dd")
             e_str = end_edit.date().toString("yyyy-MM-dd")
-            db_mod.add_absence_range(teacher.id, s_str, e_str)
-            
-            QMessageBox.information(self, "Успех", "Больничный успешно оформлен. Все плановые уроки переведены в статус ожидания замены.")
-            self.update_lesson_cache_for_teacher(teacher.id)
-            self.refresh_teacher_info()
+            try:
+                db_mod.add_absence_range(teacher.id, s_str, e_str)
+                QMessageBox.information(self, "Успех",
+                    "Больничный оформлен. Плановые уроки переведены в статус 'болеет'.")
+                self.update_lesson_cache_for_teacher(teacher.id)
+                self.refresh_teacher_info()
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось оформить больничный: {e}")
 
 
 if __name__ == '__main__':
